@@ -1,8 +1,8 @@
 local M = {}
 
-local smartclose = require("smartclose.smartclose")
-
 M.setup = function(opts)
+	local sc = require("smartclose.smartclose")
+
 	local default_options = {
 		disable_default_keybinds = false,
 		keybinds = {
@@ -30,20 +30,17 @@ M.setup = function(opts)
 	opts = vim.tbl_deep_extend("force", default_options, opts)
 
 	M.smartclose = function()
-		smartclose.smartclose(false, opts.actions)
+		sc.smartclose(false, opts.actions)
 	end
 
 	M.smartclose_force = function()
-		smartclose.smartclose(true, opts.actions)
+		sc.smartclose(true, opts.actions)
 	end
-
-	local mode = "n"
-	local keymap_opts = { noremap = true, silent = true }
 
 	for f, keybind in pairs(opts.keybinds) do
 		local func = M[tostring(f)]
 		if func ~= nil then
-			vim.keymap.set(mode, keybind, func, keymap_opts)
+			vim.keymap.set("n", keybind, func, { noremap = true, silent = true, desc = "SmartClose: " .. f })
 		end
 	end
 end
