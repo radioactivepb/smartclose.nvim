@@ -438,19 +438,17 @@ M.smartclose = function(force, options, buf)
 
 	M.mode_switch_normal()
 
-	-- No buffers? Quit Neovim. Forced.
 	if buffer_count == 0 then
 		M.vim_close_all(true)
 	end
 
 	-- HACK: LSP buffer loading check
-	-- if you close a buffer while an lsp is loading, the vim.schedule that the lsp is using will error
+	-- This is a hacky solution to prevent closing a buffer that is currently loading an LSP
+	-- vim.schedule callbacks for that buffer will result in an error if the buffer is closed before the callback is executed
 	if M.buffer_lsp_is_loading(current_buffer) then
 		return
 	end
 
-	-- Only one buffer? Check if it's empty. If so, quit Neovim. Forced.
-	-- TODO: Pain point? (Specfically regarding the order of operations)
 	if buffer_count == 1 then
 		if M.buffer_is_empty(buffer_list[1]) then
 			M.vim_close_all(true)
@@ -460,26 +458,14 @@ M.smartclose = function(force, options, buf)
 	-- NOTE: Ignore all option list handling
 
 	for _, bufnr in ipairs(buffer_list) do
-		vim.iter(options.ignore_all.buffers.filetypes):each(function(filetype)
+		vim.iter(options.ignore_all.filetypes):each(function(filetype)
 			if M.buffer_is_filetype(bufnr, filetype) then
 				table.remove(buffer_list, bufnr)
 			end
 		end)
-		vim.iter(options.ignore_all.buffers.buftypes):each(function(buftype)
+		vim.iter(options.ignore_all.buftypes):each(function(buftype)
 			if M.buffer_is_buftype(bufnr, buftype) then
 				table.remove(buffer_list, bufnr)
-			end
-		end)
-	end
-	for _, winnr in ipairs(window_list) do
-		vim.iter(options.ignore_all.windows.filetypes):each(function(filetype)
-			if M.window_is_filetype(winnr, filetype) then
-				table.remove(window_list, winnr)
-			end
-		end)
-		vim.iter(options.ignore_all.windows.buftypes):each(function(buftype)
-			if M.window_is_buftype(winnr, buftype) then
-				table.remove(window_list, winnr)
 			end
 		end)
 	end
@@ -491,19 +477,19 @@ M.smartclose = function(force, options, buf)
 	local closed_all_success = false
 
 	for _, bufnr in ipairs(buffer_list) do
-		vim.iter(options.close_all.buffers.filetypes):each(function(filetype)
+		vim.iter(options.close_all.filetypes):each(function(filetype)
 			local closed = M.buffer_close_if_filetype(bufnr, filetype, force)
 			if not closed_all_success and closed then
 				closed_all_success = true
 			end
 		end)
-		vim.iter(options.close_all.buffers.buftypes):each(function(buftype)
+		vim.iter(options.close_all.buftypes):each(function(buftype)
 			local closed = M.buffer_close_if_buftype(bufnr, buftype, force)
 			if not closed_all_success and closed then
 				closed_all_success = true
 			end
 		end)
-		if options.close_all.buffers.empty and M.buffer_is_empty(bufnr) then
+		if options.close_all.empty and M.buffer_is_empty(bufnr) then
 			local closed = M.buffer_close(bufnr, force)
 			if not closed_all_success and closed then
 				closed_all_success = true
@@ -512,19 +498,7 @@ M.smartclose = function(force, options, buf)
 	end
 
 	for _, winnr in ipairs(window_list) do
-		vim.iter(options.close_all.windows.filetypes):each(function(filetype)
-			local closed = M.window_close_if_filetype(winnr, filetype, force)
-			if not closed_all_success and closed then
-				closed_all_success = true
-			end
-		end)
-		vim.iter(options.close_all.windows.buftypes):each(function(buftype)
-			local closed = M.window_close_if_buftype(winnr, buftype, force)
-			if not closed_all_success and closed then
-				closed_all_success = true
-			end
-		end)
-		if options.close_all.windows.floating and M.window_is_floating(winnr) then
+		if options.close_all.floating and M.window_is_floating(winnr) then
 			local closed = M.window_close(winnr, force)
 			if not closed_all_success and closed then
 				closed_all_success = true

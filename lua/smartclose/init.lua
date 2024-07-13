@@ -11,26 +11,14 @@ M.setup = function(opts)
 		},
 		actions = {
 			close_all = {
-				windows = {
-					filetypes = {},
-					buftypes = {},
-					floating = true,
-				},
-				buffers = {
-					filetypes = {},
-					buftypes = {},
-					empty = true,
-				},
+				filetypes = {},
+				buftypes = {},
+				floating = true,
+				empty = true,
 			},
 			ignore_all = {
-				windows = {
-					filetypes = {},
-					buftypes = {},
-				},
-				buffers = {
-					filetypes = {},
-					buftypes = {},
-				},
+				filetypes = {},
+				buftypes = {},
 			},
 		},
 	}

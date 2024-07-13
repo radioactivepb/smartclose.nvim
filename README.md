@@ -52,56 +52,31 @@ Many options are available for easy keybindings and close actions
         -- How should smart close work for you?
         actions = {
             -- Want smart close to close all of something, all at once? Put it here!
-			close_all = {
-				windows = {
-					filetypes = {
-                        -- List any and all filetypes here
-                        -- "lua",
-                        -- "markdown"
-                    },
-					buftypes = {
-                        -- List any and all buftypes here
-                        -- "terminal"
-                    },
-                    -- Close all floating windows when smart closing?
-					floating = true,
-				},
-				buffers = {
-					filetypes = {
-                        -- List any and all filetypes here
-                        -- "lua",
-                    },
-					buftypes = {
-                        -- List any and all buftypes here
-                        -- "terminal"
-                    },
-                    -- Close all empty buffers when smart closing?
-					empty = true,
-				},
-			},
+            close_all = {
+                filetypes = {
+                    -- List any and all filetypes here
+                    -- "lua",
+                    -- "markdown"
+                },
+                buftypes = {
+                    -- List any and all buftypes here
+                    -- "terminal"
+                },
+                -- Close all floating windows when smart closing?
+                floating = true,
+                -- Close all empty buffers when smart closing?
+                empty = true,
+            },
             -- Want smart close to ignore something? Put it here!
-			ignore_all = {
-				windows = {
-					filetypes = {
-                        -- List any and all filetypes here
-                        -- "lua",
-                        -- "markdown"
-                    },
-					buftypes = {
-                        -- List any and all buftypes here
-                        -- "terminal"
-                    },
-				},
-				buffers = {
-					filetypes = {
-                        -- List any and all filetypes here
-                        -- "lua",
-                        -- "markdown"
-                    },
-					buftypes = {
-                        -- List any and all buftypes here
-                        -- "terminal"
-                    },
+            ignore_all = {
+                filetypes = {
+                    -- List any and all filetypes here
+                    -- "lua",
+                    -- "markdown"
+                },
+                buftypes = {
+                    -- List any and all buftypes here
+                    -- "terminal"
                 },
             },
         },
