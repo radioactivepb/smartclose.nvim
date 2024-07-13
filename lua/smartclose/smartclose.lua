@@ -529,7 +529,7 @@ M.smartclose = function(force, options, buf)
 	end)
 
 	vim.schedule(function()
-		if options.close_all.buffers.empty then
+		if options.close_all.empty then
 			M.buffer_close_all_empty()
 		end
 	end)
