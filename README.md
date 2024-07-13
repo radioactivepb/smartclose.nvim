@@ -12,10 +12,10 @@ Terminals, buffers, windows, tabs, floating windows, even Neovim itself!
 
 ## Features
 + Ignore certain buftypes and/or filetypes
-+ Close all of a particular buftype and/or filetype all at once
-+ Close all floating windows in one fell swoop
++ Close all of a particular buftype and/or filetype all at once (including floating windows)
 + Close terminals with ease
 + Close anything and everything with just one keybind!
++ Nothing to close but one single buffer? Close Neovim!
 
 ## Installation
 Minimal Lazy.nvim example (no keybinds, up to you to call the functions by hand)
@@ -44,14 +44,15 @@ Many options are available for easy keybindings and close actions
         disable_default_keybinds = false,
         -- All the keybinds displayed below are the default keybinds
         keybinds = {
-            -- smart close
+            -- Smart close
             smartclose = "<leader>k",
-            -- smart close!
+            -- Smart close!
             smartclose_force = "<leader>K",
         },
         -- How should smart close work for you?
         actions = {
             -- Want smart close to close all of something, all at once? Put it here!
+            -- 'Close all' will prioritize closing all of a given filetype/buftype at once
             close_all = {
                 filetypes = {
                     -- List any and all filetypes here
@@ -68,6 +69,7 @@ Many options are available for easy keybindings and close actions
                 empty = true,
             },
             -- Want smart close to ignore something? Put it here!
+            -- 'Ignore all' will keep smart close from closing a given filetype/buftype
             ignore_all = {
                 filetypes = {
                     -- List any and all filetypes here
