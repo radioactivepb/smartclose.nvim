@@ -209,6 +209,11 @@ M.buffer_close = function(bufnr, force)
 	local modified = M.buffer_is_modified(bufnr)
 	if valid then
 		if modified and not force then
+			vim.notify(
+				[[[SmartClose.nvim]
+			Buffer is modified and has not been saved.]],
+				vim.log.levels.INFO
+			)
 			return false
 		end
 		vim.api.nvim_buf_delete(bufnr, { force = force })
