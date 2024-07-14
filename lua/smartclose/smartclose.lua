@@ -1,5 +1,55 @@
 local M = {}
 
+---@param bufnr integer
+---@return table
+M.buffer_info = function(bufnr)
+	local stats = vim.uv.fs_stat(vim.api.nvim_buf_get_name(bufnr))
+	local size = stats and stats.size or 0
+	local ts_active = vim.treesitter.highlighter.active[bufnr] and true or false
+
+	local clients = {}
+	for _, buf_client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+		table.insert(clients, buf_client.name)
+	end
+
+	return {
+		buffer = {
+			lsps_active = clients,
+			treesitter_active = ts_active,
+			number = bufnr,
+			type = vim.api.nvim_get_option_value("buftype", { buf = bufnr }),
+		},
+		file = {
+			name = vim.fn.expand("%:t"),
+			path = vim.fn.expand("%:p"),
+			type = vim.api.nvim_get_option_value("filetype", { buf = bufnr }),
+			lines = vim.api.nvim_buf_line_count(bufnr),
+			size = size,
+		},
+	}
+end
+
+---@param winnr integer
+---@return table
+M.window_info = function(winnr)
+	local row, col = unpack(vim.api.nvim_win_get_cursor(winnr))
+	return {
+		cursor = {
+			row = row,
+			col = col,
+		},
+		win = {
+			floating = vim.api.nvim_win_get_config(winnr).relative ~= "",
+			height = vim.api.nvim_win_get_height(winnr),
+			number = winnr,
+			width = vim.api.nvim_win_get_width(winnr),
+		},
+		tab = {
+			number = vim.api.nvim_win_get_tabpage(winnr),
+		},
+	}
+end
+
 ---@return integer[]
 M.buffer_list = function()
 	return vim.iter(vim.api.nvim_list_bufs())
