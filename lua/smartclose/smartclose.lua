@@ -503,15 +503,18 @@ M.smartclose = function(force, options, buf)
 	-- This is a hacky solution to prevent closing a buffer that is currently loading an LSP
 	-- vim.schedule callbacks for that buffer will result in an error if the buffer is closed before the callback is executed
 	if M.buffer_lsp_is_loading(current_buffer) then
-		-- NOTE: We will at least notify the user that the buffer is currently loading an LSP to avoid confusion.
-		-- This is hopefully a temporary solution.
-		-- And like all good temporary solutions it will probably be around for a while.
-		vim.notify(
-			[[[SmartClose.nvim]
-			Buffer is currently loading an LSP.]],
-			vim.log.levels.INFO
-		)
-		return
+		-- NOTE: Force should cause this to ignore this case entirely, and just let the error happen.
+		if not force then
+			-- NOTE: We will at least notify the user that the buffer is currently loading an LSP to avoid confusion.
+			-- This is hopefully a temporary solution.
+			-- And like all good temporary solutions it will probably be around for a while.
+			vim.notify(
+				[[[SmartClose.nvim]
+				Buffer is currently loading an LSP.]],
+				vim.log.levels.INFO
+			)
+			return
+		end
 	end
 
 	if buffer_count == 1 then
