@@ -27,14 +27,14 @@ M.setup = function(opts)
 		default_options.keybinds = {}
 	end
 
-	opts = vim.tbl_deep_extend("force", default_options, opts)
+	sc.options = vim.tbl_deep_extend("force", default_options, opts)
 
 	M.smartclose = function()
-		sc.smartclose(false, opts.actions)
+		sc.smartclose(false)
 	end
 
 	M.smartclose_force = function()
-		sc.smartclose(true, opts.actions)
+		sc.smartclose(true)
 	end
 
 	for f, keybind in pairs(opts.keybinds) do
