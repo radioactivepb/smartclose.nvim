@@ -1,9 +1,14 @@
 local M = {}
 
+M.options = {}
+
 ---@param bufnr integer?
 ---@return table
 M.buffer_info = function(bufnr)
 	bufnr = bufnr or vim.api.nvim_get_current_buf()
+	if not M.buffer_exists(bufnr) then
+		return {}
+	end
 	local stats = vim.uv.fs_stat(vim.api.nvim_buf_get_name(bufnr))
 	local size = stats and stats.size or 0
 	local ts_active = vim.treesitter.highlighter.active[bufnr] and true or false
@@ -526,9 +531,8 @@ M.list_remove_value = function(list, value)
 end
 
 ---@param force boolean
----@param options table
 ---@param buf integer?
-M.smartclose = function(force, options, buf)
+M.smartclose = function(force, buf)
 	local buffer_list = M.buffer_list()
 	local current_buffer = buf or M.buffer_current()
 	local window_list = M.window_list()
@@ -549,12 +553,12 @@ M.smartclose = function(force, options, buf)
 	-- NOTE: Ignore all option list handling
 
 	for _, bufnr in ipairs(buffer_list) do
-		vim.iter(options.ignore_all.filetypes):each(function(filetype)
+		vim.iter(M.options.actions.ignore_all.filetypes):each(function(filetype)
 			if M.buffer_is_filetype(bufnr, filetype) then
 				buffer_list = M.list_remove_value(buffer_list, bufnr)
 			end
 		end)
-		vim.iter(options.ignore_all.buftypes):each(function(buftype)
+		vim.iter(M.options.actions.ignore_all.buftypes):each(function(buftype)
 			if M.buffer_is_buftype(bufnr, buftype) then
 				buffer_list = M.list_remove_value(buffer_list, bufnr)
 			end
@@ -563,12 +567,12 @@ M.smartclose = function(force, options, buf)
 
 	for _, winnr in ipairs(window_list) do
 		local bufnr = vim.api.nvim_win_get_buf(winnr)
-		vim.iter(options.ignore_all.filetypes):each(function(filetype)
+		vim.iter(M.options.actions.ignore_all.filetypes):each(function(filetype)
 			if M.buffer_is_filetype(bufnr, filetype) then
 				buffer_list = M.list_remove_value(buffer_list, bufnr)
 			end
 		end)
-		vim.iter(options.ignore_all.buftypes):each(function(buftype)
+		vim.iter(M.options.actions.ignore_all.buftypes):each(function(buftype)
 			if M.buffer_is_buftype(bufnr, buftype) then
 				buffer_list = M.list_remove_value(buffer_list, bufnr)
 			end
@@ -582,7 +586,7 @@ M.smartclose = function(force, options, buf)
 	local closed_all_success = false
 
 	for _, bufnr in ipairs(buffer_list) do
-		vim.iter(options.close_all.filetypes):each(function(filetype)
+		vim.iter(M.options.actions.close_all.filetypes):each(function(filetype)
 			vim.schedule(function()
 				if M.list_contains(buffer_list, bufnr) then
 					local closed = M.buffer_close_if_filetype(bufnr, filetype, force)
@@ -592,7 +596,7 @@ M.smartclose = function(force, options, buf)
 				end
 			end)
 		end)
-		vim.iter(options.close_all.buftypes):each(function(buftype)
+		vim.iter(M.options.actions.close_all.buftypes):each(function(buftype)
 			vim.schedule(function()
 				if M.list_contains(buffer_list, bufnr) then
 					local closed = M.buffer_close_if_buftype(bufnr, buftype, force)
@@ -602,7 +606,7 @@ M.smartclose = function(force, options, buf)
 				end
 			end)
 		end)
-		if options.close_all.empty and M.buffer_is_empty(bufnr) then
+		if M.options.actions.close_all.empty and M.buffer_is_empty(bufnr) then
 			vim.schedule(function()
 				if M.list_contains(buffer_list, bufnr) then
 					local closed = M.buffer_close(bufnr, force)
@@ -615,7 +619,7 @@ M.smartclose = function(force, options, buf)
 	end
 
 	for _, winnr in ipairs(window_list) do
-		if options.close_all.floating and M.window_is_floating(winnr) then
+		if M.options.actions.close_all.floating and M.window_is_floating(winnr) then
 			vim.schedule(function()
 				local closed = M.window_close(winnr, force)
 				if not closed_all_success and closed then
@@ -659,8 +663,8 @@ M.smartclose = function(force, options, buf)
 
 	vim.schedule(function()
 		local buffer_info = M.buffer_info(current_buffer)
-		local ft_close_allowed = not M.list_contains(options.ignore_all.filetypes, buffer_info.file.type)
-		local bt_close_allowed = not M.list_contains(options.ignore_all.buftypes, buffer_info.buffer.type)
+		local ft_close_allowed = not M.list_contains(M.options.actions.ignore_all.filetypes, buffer_info.file.type)
+		local bt_close_allowed = not M.list_contains(M.options.actions.ignore_all.buftypes, buffer_info.buffer.type)
 		if ft_close_allowed and bt_close_allowed then
 			if M.buffer_lsp_is_loading(current_buffer) then
 				M.vim_close(force)
@@ -671,7 +675,7 @@ M.smartclose = function(force, options, buf)
 	end)
 
 	vim.schedule(function()
-		if options.close_all.empty then
+		if M.options.actions.close_all.empty then
 			M.buffer_close_all_empty()
 		end
 	end)
