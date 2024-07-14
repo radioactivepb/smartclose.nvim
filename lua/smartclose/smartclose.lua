@@ -1,8 +1,9 @@
 local M = {}
 
----@param bufnr integer
+---@param bufnr integer?
 ---@return table
 M.buffer_info = function(bufnr)
+	bufnr = bufnr or vim.api.nvim_get_current_buf()
 	local stats = vim.uv.fs_stat(vim.api.nvim_buf_get_name(bufnr))
 	local size = stats and stats.size or 0
 	local ts_active = vim.treesitter.highlighter.active[bufnr] and true or false
@@ -29,9 +30,10 @@ M.buffer_info = function(bufnr)
 	}
 end
 
----@param winnr integer
+---@param winnr integer?
 ---@return table
 M.window_info = function(winnr)
+	winnr = winnr or vim.api.nvim_get_current_win()
 	local row, col = unpack(vim.api.nvim_win_get_cursor(winnr))
 	return {
 		cursor = {
