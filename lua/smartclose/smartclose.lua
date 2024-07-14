@@ -632,25 +632,25 @@ M.smartclose = function(force, options, buf)
 	-- NOTE: End close all option list handling
 
 	-- NOTE: Special cases
+	--
 
-	if M.list_contains(buffer_list, current_buffer) then
-		-- Terminal, force close
-		if M.buffer_close_if_buftype(current_buffer, "terminal", true) then
-			M.buffer_next()
-			return
-		end
-		-- Vim type, force close
-		if M.buffer_close_if_filetype(current_buffer, "vim", true) then
-			M.buffer_next()
-			return
-		end
-		-- If an LSP is loading, use "q". A bit of a hack..
-		-- Sometimes the LSP vim.schedule may be referencing a deleted buffer
-		-- and when the callback is executed, it will throw an error.
-		-- Using "q" instead of a buffer delete seems to be the workaround
-		if M.buffer_lsp_is_loading(current_buffer) then
-			M.vim_close(force)
-		end
+	-- Terminal, force close
+	if M.buffer_close_if_buftype(current_buffer, "terminal", true) then
+		M.buffer_next()
+		return
+	end
+
+	-- Vim type, force close
+	if M.buffer_close_if_filetype(current_buffer, "vim", true) then
+		M.buffer_next()
+		return
+	end
+
+	-- Empty buffer close
+	if M.buffer_is_empty(current_buffer) then
+		M.buffer_close(current_buffer, force)
+		M.buffer_next()
+		return
 	end
 
 	-- NOTE: End special cases
@@ -658,8 +658,15 @@ M.smartclose = function(force, options, buf)
 	local buffer_closed = false
 
 	vim.schedule(function()
-		if M.list_contains(buffer_list, current_buffer) then
-			buffer_closed = M.buffer_close(current_buffer, force)
+		local buffer_info = M.buffer_info(current_buffer)
+		local ft_close_allowed = not M.list_contains(options.ignore_all.filetypes, buffer_info.file.type)
+		local bt_close_allowed = not M.list_contains(options.ignore_all.buftypes, buffer_info.buffer.type)
+		if ft_close_allowed and bt_close_allowed then
+			if M.buffer_lsp_is_loading(current_buffer) then
+				M.vim_close(force)
+			else
+				buffer_closed = M.buffer_close(current_buffer, force)
+			end
 		end
 	end)
 
