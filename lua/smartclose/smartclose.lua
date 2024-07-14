@@ -539,16 +539,22 @@ M.smartclose = function(force, buf)
 
 	M.mode_switch_normal()
 
-	M.switch_case(#buffer_list, {
-		[0] = function()
-			M.vim_close_all(true)
-		end,
-		[1] = function()
-			if M.buffer_is_empty(buffer_list[1]) then
-				M.vim_close_all(true)
-			end
-		end,
-	})
+	if #buffer_list == 0 then
+		M.vim_close_all(force)
+		return
+	end
+
+	if #buffer_list == 1 then
+		local modified = M.buffer_is_modified(current_buffer)
+		if (modified and force) or not modified then
+			M.vim_close(force)
+			return
+		end
+		if modified and not force then
+			M.buffer_close(current_buffer, force)
+			return
+		end
+	end
 
 	-- NOTE: Ignore all option list handling
 
