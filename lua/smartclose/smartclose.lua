@@ -587,45 +587,37 @@ M.smartclose = function(force, buf)
 
 	for _, bufnr in ipairs(buffer_list) do
 		vim.iter(M.options.actions.close_all.filetypes):each(function(filetype)
-			vim.schedule(function()
-				if M.list_contains(buffer_list, bufnr) then
-					local closed = M.buffer_close_if_filetype(bufnr, filetype, force)
-					if not closed_all_success and closed then
-						closed_all_success = true
-					end
+			if M.list_contains(buffer_list, bufnr) then
+				local closed = M.buffer_close_if_filetype(bufnr, filetype, force)
+				if not closed_all_success and closed then
+					closed_all_success = true
 				end
-			end)
+			end
 		end)
 		vim.iter(M.options.actions.close_all.buftypes):each(function(buftype)
-			vim.schedule(function()
-				if M.list_contains(buffer_list, bufnr) then
-					local closed = M.buffer_close_if_buftype(bufnr, buftype, force)
-					if not closed_all_success and closed then
-						closed_all_success = true
-					end
+			if M.list_contains(buffer_list, bufnr) then
+				local closed = M.buffer_close_if_buftype(bufnr, buftype, force)
+				if not closed_all_success and closed then
+					closed_all_success = true
 				end
-			end)
+			end
 		end)
 		if M.options.actions.close_all.empty and M.buffer_is_empty(bufnr) then
-			vim.schedule(function()
-				if M.list_contains(buffer_list, bufnr) then
-					local closed = M.buffer_close(bufnr, force)
-					if not closed_all_success and closed then
-						closed_all_success = true
-					end
+			if M.list_contains(buffer_list, bufnr) then
+				local closed = M.buffer_close(bufnr, force)
+				if not closed_all_success and closed then
+					closed_all_success = true
 				end
-			end)
+			end
 		end
 	end
 
 	for _, winnr in ipairs(window_list) do
 		if M.options.actions.close_all.floating and M.window_is_floating(winnr) then
-			vim.schedule(function()
-				local closed = M.window_close(winnr, force)
-				if not closed_all_success and closed then
-					closed_all_success = true
-				end
-			end)
+			local closed = M.window_close(winnr, force)
+			if not closed_all_success and closed then
+				closed_all_success = true
+			end
 		end
 	end
 
