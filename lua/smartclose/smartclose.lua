@@ -589,7 +589,7 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.filetypes):each(function(filetype)
 			if M.list_contains(buffer_list, bufnr) then
 				local closed = M.buffer_close_if_filetype(bufnr, filetype, force)
-				if not closed_all_success and closed then
+				if closed then
 					closed_all_success = true
 				end
 			end
@@ -597,7 +597,7 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.buftypes):each(function(buftype)
 			if M.list_contains(buffer_list, bufnr) then
 				local closed = M.buffer_close_if_buftype(bufnr, buftype, force)
-				if not closed_all_success and closed then
+				if closed then
 					closed_all_success = true
 				end
 			end
@@ -605,7 +605,7 @@ M.smartclose = function(force, buf)
 		if M.options.actions.close_all.empty and M.buffer_is_empty(bufnr) then
 			if M.list_contains(buffer_list, bufnr) then
 				local closed = M.buffer_close(bufnr, force)
-				if not closed_all_success and closed then
+				if closed then
 					closed_all_success = true
 				end
 			end
@@ -615,7 +615,7 @@ M.smartclose = function(force, buf)
 	for _, winnr in ipairs(window_list) do
 		if M.options.actions.close_all.floating and M.window_is_floating(winnr) then
 			local closed = M.window_close(winnr, force)
-			if not closed_all_success and closed then
+			if closed then
 				closed_all_success = true
 			end
 		end
