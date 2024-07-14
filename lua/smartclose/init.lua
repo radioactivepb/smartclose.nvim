@@ -29,12 +29,14 @@ M.setup = function(opts)
 
 	sc.options = vim.tbl_deep_extend("force", default_options, opts)
 
-	M.smartclose = function()
-		sc.smartclose(false)
+	---@param bufnr integer?
+	M.smartclose = function(bufnr)
+		sc.smartclose(false, bufnr)
 	end
 
-	M.smartclose_force = function()
-		sc.smartclose(true)
+	---@param bufnr integer?
+	M.smartclose_force = function(bufnr)
+		sc.smartclose(true, bufnr)
 	end
 
 	for f, keybind in pairs(opts.keybinds) do

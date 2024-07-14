@@ -3,11 +3,11 @@ local M = {}
 M.options = {}
 
 ---@param bufnr integer?
----@return table
+---@return table?
 M.buffer_info = function(bufnr)
 	bufnr = bufnr or vim.api.nvim_get_current_buf()
 	if not M.buffer_exists(bufnr) then
-		return {}
+		return nil
 	end
 	local stats = vim.uv.fs_stat(vim.api.nvim_buf_get_name(bufnr))
 	local size = stats and stats.size or 0
@@ -663,6 +663,9 @@ M.smartclose = function(force, buf)
 
 	vim.schedule(function()
 		local buffer_info = M.buffer_info(current_buffer)
+		if not buffer_info then
+			return
+		end
 		local ft_close_allowed = not M.list_contains(M.options.actions.ignore_all.filetypes, buffer_info.file.type)
 		local bt_close_allowed = not M.list_contains(M.options.actions.ignore_all.buftypes, buffer_info.buffer.type)
 		if ft_close_allowed and bt_close_allowed then
