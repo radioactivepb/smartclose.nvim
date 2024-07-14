@@ -1,6 +1,9 @@
 # 🤏 SmartClose.nvim
 A Neovim plugin to smartly close things!
+ 
 Terminals, buffers, windows, tabs, floating windows, even Neovim itself!
+
+- [Disclaimer](#disclaimer)
 
 - [Features](#features)
  
@@ -9,6 +12,11 @@ Terminals, buffers, windows, tabs, floating windows, even Neovim itself!
 - [Options](#options)
 
 - [Functions](#functions)
+
+## Disclaimer
+If you have issues, don't hesitate to report them.
+
+However, I mainly make these plugins strictly for personal use.
 
 ## Features
 + Ignore certain buftypes and/or filetypes
