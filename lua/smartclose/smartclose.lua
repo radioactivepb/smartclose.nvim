@@ -547,6 +547,7 @@ M.smartclose = function(force, buf)
 	if #buffer_list == 1 then
 		local modified = M.buffer_is_modified(current_buffer)
 		if (modified and force) or not modified then
+			M.buffer_close(current_buffer, force)
 			M.vim_close(force)
 			return
 		end
