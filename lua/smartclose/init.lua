@@ -14,7 +14,7 @@ M.setup = function(opts)
 				filetypes = {},
 				buftypes = {},
 				floating = true,
-				empty = true,
+				empty = false,
 			},
 			ignore_all = {
 				filetypes = {},

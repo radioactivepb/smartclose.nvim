@@ -66,7 +66,7 @@ Many options are available for easy keybindings and close actions
                 -- Close all floating windows when smart closing?
                 floating = true,
                 -- Close all empty buffers when smart closing?
-                empty = true,
+                empty = false,
             },
             -- Want smart close to ignore something? Put it here!
             -- 'Ignore all' will keep smart close from closing a given filetype/buftype
