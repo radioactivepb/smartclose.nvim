@@ -62,8 +62,10 @@ M.buffer_list = function()
 	return vim.iter(vim.api.nvim_list_bufs())
 		:filter(function(bufnr)
 			local listed = vim.api.nvim_get_option_value("buflisted", { buf = bufnr })
+			local help = M.buffer_is_help(bufnr)
+			-- local docs = M.buffer_is_docs(bufnr)
 			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
-			return listed and loaded
+			return (listed or help) and loaded
 		end)
 		:totable()
 end
@@ -142,6 +144,16 @@ M.buffer_is_terminal = function(bufnr)
 	local valid = M.buffer_exists(bufnr)
 	if valid then
 		return vim.api.nvim_get_option_value("buftype", { buf = bufnr }) == "terminal"
+	end
+	return false
+end
+
+---@param bufnr integer
+---@return boolean
+M.buffer_is_modifiable = function(bufnr)
+	local valid = M.buffer_exists(bufnr)
+	if valid then
+		return vim.api.nvim_get_option_value("modifiable", { buf = bufnr })
 	end
 	return false
 end
@@ -530,14 +542,37 @@ M.list_remove_value = function(list, value)
 	return result or {}
 end
 
+---@return integer
+M.window_current = function()
+	return vim.api.nvim_get_current_win()
+end
+
+---@param bufnr integer
+---@return boolean
+M.buffer_is_split = function(bufnr)
+	local visible_buffers = M.buffer_list_visible()
+	return #visible_buffers > 1 and vim.tbl_contains(visible_buffers, bufnr)
+end
+
+-- FIXME:
+-- Having messages split and other split(s) and calling close on messages can close messages and one of the other splits
+-- TODO:
+-- Add special case for quickfix?
+
 ---@param force boolean
 ---@param buf integer?
 M.smartclose = function(force, buf)
 	local buffer_list = M.buffer_list()
 	local current_buffer = buf or M.buffer_current()
 	local window_list = M.window_list()
+	-- local current_window = M.current_window()
 	local float_exists_must_close = vim.iter(window_list):any(M.window_is_floating)
 		and M.options.actions.close_all.floating
+
+	-- Auto force close if buffer is not modifiable
+	if not M.buffer_is_modifiable(current_buffer) then
+		force = true
+	end
 
 	M.mode_switch_normal()
 
@@ -637,7 +672,12 @@ M.smartclose = function(force, buf)
 	-- NOTE: End close all option list handling
 
 	-- NOTE: Special cases
-	--
+
+	-- Split, close, don't call buffer next
+	if M.buffer_is_split(current_buffer) then
+		M.buffer_close(current_buffer, force)
+		return
+	end
 
 	-- Terminal, force close
 	if M.buffer_close_if_buftype(current_buffer, "terminal", true) then
