@@ -536,6 +536,8 @@ M.smartclose = function(force, buf)
 	local buffer_list = M.buffer_list()
 	local current_buffer = buf or M.buffer_current()
 	local window_list = M.window_list()
+	local float_exists_must_close = vim.iter(window_list):any(M.window_is_floating)
+		and M.options.actions.close_all.floating
 
 	M.mode_switch_normal()
 
@@ -544,7 +546,7 @@ M.smartclose = function(force, buf)
 		return
 	end
 
-	if #buffer_list == 1 then
+	if #buffer_list == 1 and not float_exists_must_close then
 		local modified = M.buffer_is_modified(current_buffer)
 		if (modified and force) or not modified then
 			M.buffer_close(current_buffer, force)
