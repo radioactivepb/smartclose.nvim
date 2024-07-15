@@ -569,10 +569,12 @@ M.smartclose = function(force, buf)
 	local float_exists_must_close = vim.iter(window_list):any(M.window_is_floating)
 		and M.options.actions.close_all.floating
 
+	-- TODO: Needs some work
 	-- Auto force close if buffer is not modifiable
-	if not M.buffer_is_modifiable(current_buffer) then
-		force = true
-	end
+
+	-- if not M.buffer_is_modifiable(current_buffer) then
+	--	force = true
+	-- end
 
 	M.mode_switch_normal()
 
