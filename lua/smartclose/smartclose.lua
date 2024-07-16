@@ -72,15 +72,37 @@ M.buffer_list = function()
 end
 
 ---@return integer[]
+M.buffer_list_full = function()
+	return vim.iter(vim.api.nvim_list_bufs())
+		:filter(function(bufnr)
+			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
+			return loaded
+		end)
+		:totable()
+end
+
+---@return integer[]
 M.buffer_list_visible = function()
-	return vim.iter(vim.api.nvim_list_wins())
+	local visible = vim.iter(vim.api.nvim_list_wins())
 		:map(function(winid)
 			return vim.api.nvim_win_get_buf(winid)
 		end)
 		:filter(function(bufnr)
-			return vim.tbl_contains(M.buffer_list(), bufnr)
+			return vim.tbl_contains(M.buffer_list_full(), bufnr)
 		end)
 		:totable()
+
+	for _, bufnr in ipairs(visible) do
+		local buf_filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
+		local buf_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
+		if M.list_contains(M.options.actions.ignore_all.filetypes, buf_filetype) then
+			visible = M.list_remove_value(visible, bufnr)
+		end
+		if M.list_contains(M.options.actions.ignore_all.buftypes, buf_buftype) then
+			visible = M.list_remove_value(visible, bufnr)
+		end
+	end
+	return visible
 end
 
 ---@return integer
@@ -294,6 +316,7 @@ end
 
 M.buffer_next = function()
 	local buffer_list = vim.api.nvim_list_bufs()
+	local current_buffer = vim.api.nvim_get_current_buf()
 
 	if #buffer_list == 0 then
 		return
@@ -319,6 +342,16 @@ M.buffer_next = function()
 	end)
 
 	vim.api.nvim_set_current_buf(history_list[1].buffer)
+end
+
+M.window_next = function()
+	local window_list = vim.api.nvim_list_wins()
+	local current_window = vim.api.nvim_get_current_win()
+	M.list_remove_value(window_list, current_window)
+	if #window_list == 0 then
+		return
+	end
+	vim.api.nvim_set_current_win(window_list[1])
 end
 
 ---@param bufnr integer
@@ -348,6 +381,13 @@ M.buffer_lsp_message_count = function(bufnr)
 		end
 	end
 	return count
+end
+
+---@param bufnr integer
+M.buffer_lsp_stop = function(bufnr)
+	for _, client in ipairs(M.buffer_lsp_clients(bufnr)) do
+		client.stop(true)
+	end
 end
 
 ---@param winnr integer
@@ -573,30 +613,35 @@ end
 ---@param buf integer?
 M.smartclose = function(force, buf)
 	local buffer_list = M.buffer_list()
-	local current_buffer = buf or M.buffer_current()
+	local buffer_list_visible = M.buffer_list_visible()
 	local window_list = M.window_list()
+
 	local float_exists_must_close = vim.iter(window_list):any(M.window_is_floating)
 		and M.options.actions.close_all.floating
-	local can_force_close_current_buffer = M.buffer_is_modifiable(current_buffer)
-		and not M.buffer_is_modified(current_buffer)
-	local can_force_close = can_force_close_current_buffer or force
+
+	local current_buffer = buf or M.buffer_current()
+	local current_buffer_is_modified = M.buffer_is_modified(current_buffer)
+	local current_buffer_is_modifiable = M.buffer_is_modifiable(current_buffer)
+	local force_close = (current_buffer_is_modifiable and not current_buffer_is_modified) or force
 
 	M.mode_switch_normal()
 
 	if #buffer_list == 0 then
-		M.vim_close_all(can_force_close)
+		M.vim_close_all(force_close)
 		return
 	end
 
 	if #buffer_list == 1 and not float_exists_must_close then
 		local modified = M.buffer_is_modified(current_buffer)
-		if (modified and can_force_close) or not modified then
-			M.buffer_close(current_buffer, can_force_close)
-			M.vim_close(can_force_close)
-			return
+		if (modified and force_close) or not modified then
+			if #buffer_list_visible == 1 then
+				M.buffer_close(current_buffer, force_close)
+				M.vim_close(force_close)
+				return
+			end
 		end
-		if modified and not can_force_close then
-			M.buffer_close(current_buffer, can_force_close)
+		if modified and not force_close then
+			M.buffer_close(current_buffer, force_close)
 			return
 		end
 	end
@@ -640,8 +685,8 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.filetypes):each(function(filetype)
 			if M.list_contains(buffer_list, bufnr) then
 				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and not M.buffer_is_modified(bufnr)
-				local force_close = ca_can_force_close or force
-				local closed = M.buffer_close_if_filetype(bufnr, filetype, force_close)
+				local ca_force_close = ca_can_force_close or force
+				local closed = M.buffer_close_if_filetype(bufnr, filetype, ca_force_close)
 				if closed then
 					closed_all_success = true
 				end
@@ -650,8 +695,8 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.buftypes):each(function(buftype)
 			if M.list_contains(buffer_list, bufnr) then
 				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and not M.buffer_is_modified(bufnr)
-				local force_close = ca_can_force_close or force
-				local closed = M.buffer_close_if_buftype(bufnr, buftype, force_close)
+				local ca_force_close = ca_can_force_close or force
+				local closed = M.buffer_close_if_buftype(bufnr, buftype, ca_force_close)
 				if closed then
 					closed_all_success = true
 				end
@@ -716,10 +761,9 @@ M.smartclose = function(force, buf)
 		local bt_close_allowed = not M.list_contains(M.options.actions.ignore_all.buftypes, buffer_info.buffer.type)
 		if ft_close_allowed and bt_close_allowed then
 			if M.buffer_lsp_is_loading(current_buffer) then
-				M.vim_close(can_force_close)
-			else
-				buffer_closed = M.buffer_close(current_buffer, can_force_close)
+				M.buffer_lsp_stop(current_buffer)
 			end
+			buffer_closed = M.buffer_close(current_buffer, force_close)
 		end
 	end)
 
@@ -732,6 +776,12 @@ M.smartclose = function(force, buf)
 	vim.schedule(function()
 		if buffer_closed then
 			M.buffer_next()
+		end
+	end)
+
+	vim.schedule(function()
+		if M.buffer_is_empty(M.buffer_current()) then
+			M.window_next()
 		end
 	end)
 end
