@@ -21,9 +21,9 @@ However, I mainly make these plugins strictly for personal use.
 ## Features
 + Ignore certain buftypes and/or filetypes
 + Close all of a particular buftype and/or filetype all at once (including floating windows)
-+ Close terminals with ease
 + Close anything and everything with just one keybind!
 + Nothing to close but one single buffer? Close Neovim!
++ Automatic bang insertion (will force close a buffer/window if it is unmodified)
 
 ## Installation
 Minimal Lazy.nvim example (no keybinds, up to you to call the functions by hand)
