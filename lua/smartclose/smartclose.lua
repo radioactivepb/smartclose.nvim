@@ -387,6 +387,7 @@ end
 M.buffer_lsp_stop = function(bufnr)
 	for _, client in ipairs(M.buffer_lsp_clients(bufnr)) do
 		client.stop(true)
+		client.attached_buffers[bufnr] = nil
 	end
 end
 
@@ -760,8 +761,10 @@ M.smartclose = function(force, buf)
 		local ft_close_allowed = not M.list_contains(M.options.actions.ignore_all.filetypes, buffer_info.file.type)
 		local bt_close_allowed = not M.list_contains(M.options.actions.ignore_all.buftypes, buffer_info.buffer.type)
 		if ft_close_allowed and bt_close_allowed then
-			if M.buffer_lsp_is_loading(current_buffer) then
-				M.buffer_lsp_stop(current_buffer)
+			if #M.buffer_lsp_clients(current_buffer) > 0 then
+				if M.buffer_lsp_is_loading(current_buffer) then
+					M.buffer_lsp_stop(current_buffer)
+				end
 			end
 			buffer_closed = M.buffer_close(current_buffer, force_close)
 		end
