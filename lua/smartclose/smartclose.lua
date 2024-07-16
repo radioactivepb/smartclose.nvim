@@ -24,6 +24,7 @@ M.buffer_info = function(bufnr)
 			treesitter_active = ts_active,
 			number = bufnr,
 			type = vim.api.nvim_get_option_value("buftype", { buf = bufnr }),
+			lastused = vim.fn.getbufinfo(bufnr)[1].lastused,
 		},
 		file = {
 			name = vim.fn.expand("%:t"),
@@ -292,11 +293,32 @@ M.buffer_close = function(bufnr, force)
 end
 
 M.buffer_next = function()
-	if M.buffer_count() > 0 then
-		vim.api.nvim_cmd({
-			cmd = "bn",
-		}, {})
+	local buffer_list = vim.api.nvim_list_bufs()
+
+	if #buffer_list == 0 then
+		return
 	end
+
+	local history_list = vim.iter(buffer_list)
+		:filter(function(bufnr)
+			return vim.api.nvim_buf_is_loaded(bufnr)
+		end)
+		:filter(function(bufnr)
+			return vim.api.nvim_get_option_value("buflisted", { buf = bufnr }) == true
+		end)
+		:map(function(bufnr)
+			return {
+				buffer = bufnr,
+				lastused = vim.fn.getbufinfo(bufnr)[1].lastused,
+			}
+		end)
+		:totable()
+
+	table.sort(history_list, function(a, b)
+		return a.lastused > b.lastused
+	end)
+
+	vim.api.nvim_set_current_buf(history_list[1].buffer)
 end
 
 ---@param bufnr integer
@@ -547,51 +569,34 @@ M.window_current = function()
 	return vim.api.nvim_get_current_win()
 end
 
----@param bufnr integer
----@return boolean
-M.buffer_is_split = function(bufnr)
-	local visible_buffers = M.buffer_list_visible()
-	return #visible_buffers > 1 and vim.tbl_contains(visible_buffers, bufnr)
-end
-
--- FIXME:
--- Having messages split and other split(s) and calling close on messages can close messages and one of the other splits
--- TODO:
--- Add special case for quickfix?
-
 ---@param force boolean
 ---@param buf integer?
 M.smartclose = function(force, buf)
 	local buffer_list = M.buffer_list()
 	local current_buffer = buf or M.buffer_current()
 	local window_list = M.window_list()
-	-- local current_window = M.current_window()
 	local float_exists_must_close = vim.iter(window_list):any(M.window_is_floating)
 		and M.options.actions.close_all.floating
-
-	-- TODO: Needs some work
-	-- Auto force close if buffer is not modifiable
-
-	-- if not M.buffer_is_modifiable(current_buffer) then
-	--	force = true
-	-- end
+	local can_force_close_current_buffer = M.buffer_is_modifiable(current_buffer)
+		and not M.buffer_is_modified(current_buffer)
+	local can_force_close = can_force_close_current_buffer or force
 
 	M.mode_switch_normal()
 
 	if #buffer_list == 0 then
-		M.vim_close_all(force)
+		M.vim_close_all(can_force_close)
 		return
 	end
 
 	if #buffer_list == 1 and not float_exists_must_close then
 		local modified = M.buffer_is_modified(current_buffer)
-		if (modified and force) or not modified then
-			M.buffer_close(current_buffer, force)
-			M.vim_close(force)
+		if (modified and can_force_close) or not modified then
+			M.buffer_close(current_buffer, can_force_close)
+			M.vim_close(can_force_close)
 			return
 		end
-		if modified and not force then
-			M.buffer_close(current_buffer, force)
+		if modified and not can_force_close then
+			M.buffer_close(current_buffer, can_force_close)
 			return
 		end
 	end
@@ -634,7 +639,9 @@ M.smartclose = function(force, buf)
 	for _, bufnr in ipairs(buffer_list) do
 		vim.iter(M.options.actions.close_all.filetypes):each(function(filetype)
 			if M.list_contains(buffer_list, bufnr) then
-				local closed = M.buffer_close_if_filetype(bufnr, filetype, force)
+				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and not M.buffer_is_modified(bufnr)
+				local force_close = ca_can_force_close or force
+				local closed = M.buffer_close_if_filetype(bufnr, filetype, force_close)
 				if closed then
 					closed_all_success = true
 				end
@@ -642,7 +649,9 @@ M.smartclose = function(force, buf)
 		end)
 		vim.iter(M.options.actions.close_all.buftypes):each(function(buftype)
 			if M.list_contains(buffer_list, bufnr) then
-				local closed = M.buffer_close_if_buftype(bufnr, buftype, force)
+				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and not M.buffer_is_modified(bufnr)
+				local force_close = ca_can_force_close or force
+				local closed = M.buffer_close_if_buftype(bufnr, buftype, force_close)
 				if closed then
 					closed_all_success = true
 				end
@@ -650,7 +659,7 @@ M.smartclose = function(force, buf)
 		end)
 		if M.options.actions.close_all.empty and M.buffer_is_empty(bufnr) then
 			if M.list_contains(buffer_list, bufnr) then
-				local closed = M.buffer_close(bufnr, force)
+				local closed = M.buffer_close(bufnr, true)
 				if closed then
 					closed_all_success = true
 				end
@@ -675,12 +684,6 @@ M.smartclose = function(force, buf)
 
 	-- NOTE: Special cases
 
-	-- Split, close, don't call buffer next
-	if M.buffer_is_split(current_buffer) then
-		M.buffer_close(current_buffer, force)
-		return
-	end
-
 	-- Terminal, force close
 	if M.buffer_close_if_buftype(current_buffer, "terminal", true) then
 		M.buffer_next()
@@ -695,7 +698,7 @@ M.smartclose = function(force, buf)
 
 	-- Empty buffer close
 	if M.buffer_is_empty(current_buffer) then
-		M.buffer_close(current_buffer, force)
+		M.buffer_close(current_buffer, true)
 		M.buffer_next()
 		return
 	end
@@ -713,9 +716,9 @@ M.smartclose = function(force, buf)
 		local bt_close_allowed = not M.list_contains(M.options.actions.ignore_all.buftypes, buffer_info.buffer.type)
 		if ft_close_allowed and bt_close_allowed then
 			if M.buffer_lsp_is_loading(current_buffer) then
-				M.vim_close(force)
+				M.vim_close(can_force_close)
 			else
-				buffer_closed = M.buffer_close(current_buffer, force)
+				buffer_closed = M.buffer_close(current_buffer, can_force_close)
 			end
 		end
 	end)
