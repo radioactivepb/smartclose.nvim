@@ -316,7 +316,6 @@ end
 
 M.buffer_next = function()
 	local buffer_list = vim.api.nvim_list_bufs()
-	local current_buffer = vim.api.nvim_get_current_buf()
 
 	if #buffer_list == 0 then
 		return
