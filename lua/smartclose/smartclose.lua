@@ -36,35 +36,12 @@ M.buffer_info = function(bufnr)
 	}
 end
 
----@param winnr integer?
----@return table
-M.window_info = function(winnr)
-	winnr = winnr or vim.api.nvim_get_current_win()
-	local row, col = unpack(vim.api.nvim_win_get_cursor(winnr))
-	return {
-		cursor = {
-			row = row,
-			col = col,
-		},
-		win = {
-			floating = vim.api.nvim_win_get_config(winnr).relative ~= "",
-			height = vim.api.nvim_win_get_height(winnr),
-			number = winnr,
-			width = vim.api.nvim_win_get_width(winnr),
-		},
-		tab = {
-			number = vim.api.nvim_win_get_tabpage(winnr),
-		},
-	}
-end
-
 ---@return integer[]
 M.buffer_list = function()
 	return vim.iter(vim.api.nvim_list_bufs())
 		:filter(function(bufnr)
 			local listed = vim.api.nvim_get_option_value("buflisted", { buf = bufnr })
 			local help = M.buffer_is_help(bufnr)
-			-- local docs = M.buffer_is_docs(bufnr)
 			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
 			return (listed or help) and loaded
 		end)
@@ -72,7 +49,7 @@ M.buffer_list = function()
 end
 
 ---@return integer[]
-M.buffer_list_full = function()
+M.buffer_list_all = function()
 	return vim.iter(vim.api.nvim_list_bufs())
 		:filter(function(bufnr)
 			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
@@ -88,7 +65,7 @@ M.buffer_list_visible = function()
 			return vim.api.nvim_win_get_buf(winid)
 		end)
 		:filter(function(bufnr)
-			return vim.tbl_contains(M.buffer_list_full(), bufnr)
+			return vim.tbl_contains(M.buffer_list_all(), bufnr)
 		end)
 		:totable()
 
@@ -103,16 +80,6 @@ M.buffer_list_visible = function()
 		end
 	end
 	return visible
-end
-
----@return integer
-M.buffer_count = function()
-	return #M.buffer_list()
-end
-
----@return integer
-M.buffer_count_visible = function()
-	return #M.buffer_list_visible()
 end
 
 ---@param bufnr integer
@@ -151,28 +118,6 @@ end
 
 ---@param bufnr integer
 ---@return boolean
-M.buffer_is_docs = function(bufnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local no_name = vim.api.nvim_buf_get_name(bufnr) == ""
-		local nofile_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr }) == "nofile"
-		return nofile_buftype and no_name
-	end
-	return false
-end
-
----@param bufnr integer
----@return boolean
-M.buffer_is_terminal = function(bufnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		return vim.api.nvim_get_option_value("buftype", { buf = bufnr }) == "terminal"
-	end
-	return false
-end
-
----@param bufnr integer
----@return boolean
 M.buffer_is_modifiable = function(bufnr)
 	local valid = M.buffer_exists(bufnr)
 	if valid then
@@ -186,15 +131,12 @@ M.buffer_current = function()
 	return vim.api.nvim_get_current_buf()
 end
 
----@param bufnr integer
-M.buffer_close_if_empty = function(bufnr)
-	if M.buffer_is_empty(bufnr) then
-		vim.api.nvim_buf_delete(bufnr, { force = true })
-	end
-end
-
 M.buffer_close_all_empty = function()
-	vim.iter(M.buffer_list()):each(M.buffer_close_if_empty)
+	vim.iter(M.buffer_list()):each(function(bufnr)
+		if M.buffer_is_empty(bufnr) then
+			vim.api.nvim_buf_delete(bufnr, { force = true })
+		end
+	end)
 end
 
 ---@param bufnr integer
@@ -214,19 +156,6 @@ M.buffer_close_if_filetype = function(bufnr, filetype, force)
 end
 
 ---@param bufnr integer
----@param filetype string
----@param force boolean
-M.buffer_close_if_not_filetype = function(bufnr, filetype, force)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local buf_filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
-		if buf_filetype ~= filetype then
-			vim.api.nvim_buf_delete(bufnr, { force = force })
-		end
-	end
-end
-
----@param bufnr integer
 ---@param buftype string
 ---@param force boolean
 --- Returns true if the buffer was closed
@@ -235,22 +164,6 @@ M.buffer_close_if_buftype = function(bufnr, buftype, force)
 	if valid then
 		local buf_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
 		if buf_buftype == buftype then
-			vim.api.nvim_buf_delete(bufnr, { force = force })
-			return true
-		end
-	end
-	return false
-end
-
----@param bufnr integer
----@param buftype string
----@param force boolean
---- Returns true if the buffer was closed
-M.buffer_close_if_not_buftype = function(bufnr, buftype, force)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local buf_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
-		if buf_buftype ~= buftype then
 			vim.api.nvim_buf_delete(bufnr, { force = force })
 			return true
 		end
@@ -353,43 +266,6 @@ M.window_next = function()
 	vim.api.nvim_set_current_win(window_list[1])
 end
 
----@param bufnr integer
----@return vim.lsp.Client[]
-M.buffer_lsp_clients = function(bufnr)
-	return vim.lsp.get_clients({ bufnr = bufnr })
-end
-
----@param bufnr integer
----@return boolean
-M.buffer_lsp_is_loading = function(bufnr)
-	for _, client in ipairs(M.buffer_lsp_clients(bufnr)) do
-		if #client.progress.pending > 0 then
-			return true
-		end
-	end
-	return false
-end
-
----@param bufnr integer
----@return integer
-M.buffer_lsp_message_count = function(bufnr)
-	local count = 0
-	for _, client in ipairs(M.buffer_lsp_clients(bufnr)) do
-		if #client.progress.pending > 0 then
-			count = count + 1
-		end
-	end
-	return count
-end
-
----@param bufnr integer
-M.buffer_lsp_stop = function(bufnr)
-	for _, client in ipairs(M.buffer_lsp_clients(bufnr)) do
-		client.stop(true)
-		client.attached_buffers[bufnr] = nil
-	end
-end
-
 ---@param winnr integer
 ---@return boolean
 M.window_exists = function(winnr)
@@ -422,129 +298,9 @@ M.window_is_floating = function(winnr)
 	return false
 end
 
----@param winnr integer
----@param filetype string
----@return boolean
-M.window_is_filetype = function(winnr, filetype)
-	local bufnr = vim.api.nvim_win_get_buf(winnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local win_buftype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
-		return win_buftype == filetype
-	end
-	return false
-end
-
----@param winnr integer
----@param buftype string
----@return boolean
-M.window_is_buftype = function(winnr, buftype)
-	local bufnr = vim.api.nvim_win_get_buf(winnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local win_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
-		return win_buftype == buftype
-	end
-	return false
-end
-
----@param winnr integer
----@param filetype string
----@param force boolean
----@return boolean
---- Returns true if the window was closed
-M.window_close_if_filetype = function(winnr, filetype, force)
-	local bufnr = vim.api.nvim_win_get_buf(winnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local win_buftype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
-		if win_buftype == filetype then
-			vim.api.nvim_win_close(winnr, force)
-			return true
-		end
-	end
-	return false
-end
-
----@param winnr integer
----@param filetype string
----@param force boolean
---- Returns true if the window was closed
-M.window_close_if_not_filetype = function(winnr, filetype, force)
-	local bufnr = vim.api.nvim_win_get_buf(winnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local win_buftype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
-		if win_buftype == filetype then
-			vim.api.nvim_win_close(winnr, force)
-			return true
-		end
-	end
-	return false
-end
-
----@param winnr integer
----@param buftype string
----@param force boolean
---- Returns true if the window was closed
-M.window_close_if_buftype = function(winnr, buftype, force)
-	local bufnr = vim.api.nvim_win_get_buf(winnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local win_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
-		if win_buftype == buftype then
-			vim.api.nvim_win_close(winnr, force)
-			return true
-		end
-	end
-	return false
-end
-
----@param winnr integer
----@param buftype string
----@param force boolean
---- Returns true if the window was closed
-M.window_close_if_not_buftype = function(winnr, buftype, force)
-	local bufnr = vim.api.nvim_win_get_buf(winnr)
-	local valid = M.buffer_exists(bufnr)
-	if valid then
-		local win_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
-		if win_buftype ~= buftype then
-			vim.api.nvim_win_close(winnr, force)
-			return true
-		end
-	end
-	return false
-end
-
 M.mode_switch_normal = function()
 	local esc_key = vim.api.nvim_replace_termcodes("<ESC><ESC><ESC>", true, false, true)
 	vim.api.nvim_feedkeys(esc_key, "n", true)
-end
-
-M.mode_switch_visual = function()
-	vim.api.nvim_feedkeys("v", "n", true)
-end
-
-M.mode_switch_visual_line = function()
-	vim.api.nvim_feedkeys("V", "n", true)
-end
-
-M.mode_switch_visual_block = function()
-	local vblock_key = vim.api.nvim_replace_termcodes("<C-v>", true, false, true)
-	vim.api.nvim_feedkeys(vblock_key, "n", true)
-end
-
-M.mode_switch_insert = function()
-	vim.api.nvim_feedkeys("i", "n", true)
-end
-
-M.mode_switch_insert_prepend = function()
-	vim.api.nvim_feedkeys("I", "n", true)
-end
-
-M.mode_switch_insert_append = function()
-	vim.api.nvim_feedkeys("A", "n", true)
 end
 
 ---@param force boolean
@@ -561,19 +317,6 @@ M.vim_close_all = function(force)
 		cmd = "qa",
 		bang = force,
 	}, {})
-end
-
----@generic A
----@param value A
----@param cases table<A, fun() | nil>
----@param fallthrough fun()?
-M.switch_case = function(value, cases, fallthrough)
-	if type(cases[value]) == "function" then
-		cases[value]()
-	end
-	if fallthrough and type(fallthrough) == "function" then
-		fallthrough()
-	end
 end
 
 ---@generic A
@@ -602,11 +345,6 @@ M.list_remove_value = function(list, value)
 		end
 	end
 	return result or {}
-end
-
----@return integer
-M.window_current = function()
-	return vim.api.nvim_get_current_win()
 end
 
 ---@param force boolean
@@ -760,11 +498,6 @@ M.smartclose = function(force, buf)
 		local ft_close_allowed = not M.list_contains(M.options.actions.ignore_all.filetypes, buffer_info.file.type)
 		local bt_close_allowed = not M.list_contains(M.options.actions.ignore_all.buftypes, buffer_info.buffer.type)
 		if ft_close_allowed and bt_close_allowed then
-			if #M.buffer_lsp_clients(current_buffer) > 0 then
-				if M.buffer_lsp_is_loading(current_buffer) then
-					M.buffer_lsp_stop(current_buffer)
-				end
-			end
 			buffer_closed = M.buffer_close(current_buffer, force_close)
 		end
 	end)
