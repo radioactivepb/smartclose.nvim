@@ -377,6 +377,10 @@ M.smartclose = function(force, buf)
 		local modified = M.buffer_is_modified(current_buffer)
 		if (modified and force_close) or not modified then
 			if #buffer_list_visible == 1 then
+				-- Special cases where a force is necessary to close
+				M.buffer_close_if_buftype(current_buffer, "terminal", true)
+				M.buffer_close_if_filetype(current_buffer, "vim", true)
+
 				M.buffer_close(current_buffer, force_close)
 				M.vim_close(force_close)
 				return
@@ -470,7 +474,6 @@ M.smartclose = function(force, buf)
 	-- NOTE: End close all option list handling
 
 	-- NOTE: Special cases
-
 	-- Terminal, force close
 	if M.buffer_close_if_buftype(current_buffer, "terminal", true) then
 		M.buffer_next()
