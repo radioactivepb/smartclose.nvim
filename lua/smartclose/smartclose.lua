@@ -253,7 +253,11 @@ M.buffer_next = function()
 		return a.lastused > b.lastused
 	end)
 
-	vim.api.nvim_set_current_buf(history_list[1].buffer)
+	local switch_buffer = history_list[1].buffer
+
+	if M.buffer_exists(switch_buffer) then
+		vim.api.nvim_set_current_buf(switch_buffer)
+	end
 end
 
 M.window_next = function()
@@ -498,25 +502,26 @@ M.smartclose = function(force, buf)
 		local ft_close_allowed = not M.list_contains(M.options.actions.ignore_all.filetypes, buffer_info.file.type)
 		local bt_close_allowed = not M.list_contains(M.options.actions.ignore_all.buftypes, buffer_info.buffer.type)
 		if ft_close_allowed and bt_close_allowed then
-			buffer_closed = M.buffer_close(current_buffer, force_close)
+			local success, _ = pcall(M.buffer_close, current_buffer, force_close)
+			buffer_closed = success or false
 		end
 	end)
 
 	vim.schedule(function()
 		if M.options.actions.close_all.empty then
-			M.buffer_close_all_empty()
+			pcall(M.buffer_close_all_empty)
 		end
 	end)
 
 	vim.schedule(function()
 		if buffer_closed then
-			M.buffer_next()
+			pcall(M.buffer_next)
 		end
 	end)
 
 	vim.schedule(function()
 		if M.buffer_is_empty(M.buffer_current()) then
-			M.window_next()
+			pcall(M.window_next)
 		end
 	end)
 end
