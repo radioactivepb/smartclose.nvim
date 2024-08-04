@@ -480,12 +480,6 @@ M.smartclose = function(force, buf)
 		return
 	end
 
-	-- Vim type, force close
-	if M.buffer_close_if_filetype(current_buffer, "vim", true) then
-		M.buffer_next()
-		return
-	end
-
 	-- Empty buffer close
 	if M.buffer_is_empty(current_buffer) then
 		M.buffer_close(current_buffer, true)
