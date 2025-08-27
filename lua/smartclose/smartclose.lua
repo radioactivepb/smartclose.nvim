@@ -388,7 +388,9 @@ M.smartclose = function(force, buf)
 	    and M.options.actions.close_all.floating
 
 	local current_window = vim.api.nvim_get_current_win()
-	local window_config_before = M.window_get_config(current_window)
+
+	local current_tabpage = vim.api.nvim_get_current_tabpage()
+	local window_layout = vim.fn.winlayout(current_tabpage)
 
 	local current_buffer = buf or M.buffer_current()
 	local current_buffer_is_modified = M.buffer_is_modified(current_buffer)
@@ -546,13 +548,9 @@ M.smartclose = function(force, buf)
 	vim.schedule(function()
 		if buffer_closed then
 			pcall(M.buffer_next)
+			-- TODO:restore previous window layout that was saved by winlayout()
+			-- previous winlayout is saved in local variable window_layout
 			vim.schedule(function()
-				if window_config_before then
-					M.window_set_config(
-						vim.api.nvim_get_current_win(),
-						window_config_before
-					)
-				end
 			end)
 		end
 	end)
