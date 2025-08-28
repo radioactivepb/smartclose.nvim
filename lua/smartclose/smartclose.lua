@@ -39,35 +39,35 @@ end
 ---@return integer[]
 M.buffer_list = function()
 	return vim.iter(vim.api.nvim_list_bufs())
-	    :filter(function(bufnr)
-		    local listed = vim.api.nvim_get_option_value("buflisted", { buf = bufnr })
-		    local help = M.buffer_is_help(bufnr)
-		    local loaded = vim.api.nvim_buf_is_loaded(bufnr)
-		    return (listed or help) and loaded
-	    end)
-	    :totable()
+		:filter(function(bufnr)
+			local listed = vim.api.nvim_get_option_value("buflisted", { buf = bufnr })
+			local help = M.buffer_is_help(bufnr)
+			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
+			return (listed or help) and loaded
+		end)
+		:totable()
 end
 
 ---@return integer[]
 M.buffer_list_all = function()
 	return vim.iter(vim.api.nvim_list_bufs())
-	    :filter(function(bufnr)
-		    local loaded = vim.api.nvim_buf_is_loaded(bufnr)
-		    return loaded
-	    end)
-	    :totable()
+		:filter(function(bufnr)
+			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
+			return loaded
+		end)
+		:totable()
 end
 
 ---@return integer[]
 M.buffer_list_visible = function()
 	local visible = vim.iter(vim.api.nvim_list_wins())
-	    :map(function(winid)
-		    return vim.api.nvim_win_get_buf(winid)
-	    end)
-	    :filter(function(bufnr)
-		    return vim.tbl_contains(M.buffer_list_all(), bufnr)
-	    end)
-	    :totable()
+		:map(function(winid)
+			return vim.api.nvim_win_get_buf(winid)
+		end)
+		:filter(function(bufnr)
+			return vim.tbl_contains(M.buffer_list_all(), bufnr)
+		end)
+		:totable()
 
 	for _, bufnr in ipairs(visible) do
 		local buf_filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
@@ -131,10 +131,11 @@ M.buffer_current = function()
 	return vim.api.nvim_get_current_buf()
 end
 
+--- Closes all empty buffers
 M.buffer_close_all_empty = function()
 	vim.iter(M.buffer_list()):each(function(bufnr)
 		if M.buffer_is_empty(bufnr) then
-			vim.api.nvim_buf_delete(bufnr, { force = true })
+			M.buffer_close(bufnr, true)
 		end
 	end)
 end
@@ -148,8 +149,7 @@ M.buffer_close_if_filetype = function(bufnr, filetype, force)
 	if valid then
 		local buf_filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
 		if buf_filetype == filetype then
-			vim.api.nvim_buf_delete(bufnr, { force = force })
-			return true
+			return M.buffer_close(bufnr, force) -- Use our improved buffer_close
 		end
 	end
 	return false
@@ -164,8 +164,7 @@ M.buffer_close_if_buftype = function(bufnr, buftype, force)
 	if valid then
 		local buf_buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
 		if buf_buftype == buftype then
-			vim.api.nvim_buf_delete(bufnr, { force = force })
-			return true
+			return M.buffer_close(bufnr, force) -- Use our improved buffer_close
 		end
 	end
 	return false
@@ -195,6 +194,70 @@ M.buffer_is_buftype = function(bufnr, buftype)
 	return false
 end
 
+-- New helper function to find a suitable replacement buffer with priority system
+---@param exclude_bufnr integer
+---@return integer|nil
+M.get_replacement_buffer = function(exclude_bufnr)
+	local buffer_list = vim.api.nvim_list_bufs()
+
+	local priority_buffers = {
+		normal_files = {},
+		listed_buffers = {},
+		help_buffers = {},
+		terminal_buffers = {},
+	}
+
+	for _, bufnr in ipairs(buffer_list) do
+		if bufnr ~= exclude_bufnr and vim.api.nvim_buf_is_loaded(bufnr) then
+			local buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
+			local filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
+			local buflisted = vim.api.nvim_get_option_value("buflisted", { buf = bufnr })
+			local lastused = vim.fn.getbufinfo(bufnr)[1].lastused
+
+			local buffer_info = {
+				buffer = bufnr,
+				lastused = lastused,
+				buftype = buftype,
+				filetype = filetype,
+				buflisted = buflisted,
+			}
+
+			-- Categorize by priority
+			if buftype == "" and buflisted and filetype ~= "help" then
+				-- Normal file buffers (highest priority)
+				table.insert(priority_buffers.normal_files, buffer_info)
+			elseif buftype == "help" or filetype == "help" then
+				-- Help buffers
+				table.insert(priority_buffers.help_buffers, buffer_info)
+			elseif buftype == "terminal" then
+				-- Terminal buffers (lowest priority)
+				table.insert(priority_buffers.terminal_buffers, buffer_info)
+			elseif buflisted then
+				-- Other listed buffers
+				table.insert(priority_buffers.listed_buffers, buffer_info)
+			end
+		end
+	end
+
+	for _, category in pairs(priority_buffers) do
+		table.sort(category, function(a, b)
+			return a.lastused > b.lastused
+		end)
+	end
+
+	if #priority_buffers.normal_files > 0 then
+		return priority_buffers.normal_files[1].buffer
+	elseif #priority_buffers.listed_buffers > 0 then
+		return priority_buffers.listed_buffers[1].buffer
+	elseif #priority_buffers.help_buffers > 0 then
+		return priority_buffers.help_buffers[1].buffer
+	elseif #priority_buffers.terminal_buffers > 0 then
+		return priority_buffers.terminal_buffers[1].buffer
+	end
+
+	return nil
+end
+
 ---@param bufnr integer
 ---@return boolean
 M.buffer_is_modified = function(bufnr)
@@ -216,11 +279,44 @@ M.buffer_close = function(bufnr, force)
 		if modified and not force then
 			vim.notify(
 				[[[SmartClose.nvim]
-			Buffer is modified and has not been saved.]],
+		Buffer is modified and has not been saved.]],
 				vim.log.levels.INFO
 			)
 			return false
 		end
+
+		local windows_with_buffer = {}
+		for _, winnr in ipairs(vim.api.nvim_list_wins()) do
+			if vim.api.nvim_win_is_valid(winnr) and vim.api.nvim_win_get_buf(winnr) == bufnr then
+				table.insert(windows_with_buffer, winnr)
+			end
+		end
+
+		for _, winnr in ipairs(windows_with_buffer) do
+			local replacement_bufnr = M.get_replacement_buffer(bufnr)
+			if replacement_bufnr and replacement_bufnr ~= bufnr then
+				vim.api.nvim_win_set_buf(winnr, replacement_bufnr)
+			else
+				local any_other_buffer = false
+				for _, other_bufnr in ipairs(vim.api.nvim_list_bufs()) do
+					if other_bufnr ~= bufnr and vim.api.nvim_buf_is_loaded(other_bufnr) then
+						any_other_buffer = true
+						break
+					end
+				end
+
+				if not any_other_buffer then
+					local new_buf = vim.api.nvim_create_buf(true, false)
+					vim.api.nvim_win_set_buf(winnr, new_buf)
+				else
+					vim.api.nvim_buf_delete(bufnr, { force = force })
+					vim.notify("Could not find suitable replacement buffer", vim.log.levels.WARN)
+					return false
+				end
+			end
+		end
+
+		-- Now safe to delete the buffer
 		vim.api.nvim_buf_delete(bufnr, { force = force })
 		return true
 	end
@@ -229,34 +325,39 @@ end
 
 M.buffer_next = function()
 	local buffer_list = vim.api.nvim_list_bufs()
-
 	if #buffer_list == 0 then
+		local new_buf = vim.api.nvim_create_buf(true, false)
+		vim.api.nvim_set_current_buf(new_buf)
 		return
 	end
 
 	local history_list = vim.iter(buffer_list)
-	    :filter(function(bufnr)
-		    return vim.api.nvim_buf_is_loaded(bufnr)
-	    end)
-	    :filter(function(bufnr)
-		    return vim.api.nvim_get_option_value("buflisted", { buf = bufnr }) == true
-	    end)
-	    :map(function(bufnr)
-		    return {
-			    buffer = bufnr,
-			    lastused = vim.fn.getbufinfo(bufnr)[1].lastused,
-		    }
-	    end)
-	    :totable()
+		:filter(function(bufnr)
+			return vim.api.nvim_buf_is_loaded(bufnr)
+		end)
+		:filter(function(bufnr)
+			return vim.api.nvim_get_option_value("buflisted", { buf = bufnr }) == true
+		end)
+		:map(function(bufnr)
+			return {
+				buffer = bufnr,
+				lastused = vim.fn.getbufinfo(bufnr)[1].lastused,
+			}
+		end)
+		:totable()
 
 	table.sort(history_list, function(a, b)
 		return a.lastused > b.lastused
 	end)
 
-	local switch_buffer = history_list[1].buffer
-
-	if M.buffer_exists(switch_buffer) then
-		vim.api.nvim_set_current_buf(switch_buffer)
+	if #history_list > 0 then
+		local switch_buffer = history_list[1].buffer
+		if M.buffer_exists(switch_buffer) then
+			vim.api.nvim_set_current_buf(switch_buffer)
+		end
+	else
+		local new_buf = vim.api.nvim_create_buf(true, false)
+		vim.api.nvim_set_current_buf(new_buf)
 	end
 end
 
@@ -379,18 +480,13 @@ end
 ---@param force boolean
 ---@param buf integer?
 M.smartclose = function(force, buf)
+	print('DEBUG: ' .. 'Smartclose called')
 	local buffer_list = M.buffer_list()
 	local buffer_list_visible = M.buffer_list_visible()
 	local window_list = M.window_list()
 
-
 	local float_exists_must_close = vim.iter(window_list):any(M.window_is_floating)
-	    and M.options.actions.close_all.floating
-
-	local current_window = vim.api.nvim_get_current_win()
-
-	local current_tabpage = vim.api.nvim_get_current_tabpage()
-	local window_layout = vim.fn.winlayout(current_tabpage)
+		and M.options.actions.close_all.floating
 
 	local current_buffer = buf or M.buffer_current()
 	local current_buffer_is_modified = M.buffer_is_modified(current_buffer)
@@ -462,7 +558,7 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.filetypes):each(function(filetype)
 			if M.list_contains(buffer_list, bufnr) then
 				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and
-				    not M.buffer_is_modified(bufnr)
+					not M.buffer_is_modified(bufnr)
 				local ca_force_close = ca_can_force_close or force
 				local closed = M.buffer_close_if_filetype(bufnr, filetype, ca_force_close)
 				if closed then
@@ -473,7 +569,7 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.buftypes):each(function(buftype)
 			if M.list_contains(buffer_list, bufnr) then
 				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and
-				    not M.buffer_is_modified(bufnr)
+					not M.buffer_is_modified(bufnr)
 				local ca_force_close = ca_can_force_close or force
 				local closed = M.buffer_close_if_buftype(bufnr, buftype, ca_force_close)
 				if closed then
@@ -548,10 +644,6 @@ M.smartclose = function(force, buf)
 	vim.schedule(function()
 		if buffer_closed then
 			pcall(M.buffer_next)
-			-- TODO:restore previous window layout that was saved by winlayout()
-			-- previous winlayout is saved in local variable window_layout
-			vim.schedule(function()
-			end)
 		end
 	end)
 
