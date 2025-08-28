@@ -39,35 +39,35 @@ end
 ---@return integer[]
 M.buffer_list = function()
 	return vim.iter(vim.api.nvim_list_bufs())
-		:filter(function(bufnr)
-			local listed = vim.api.nvim_get_option_value("buflisted", { buf = bufnr })
-			local help = M.buffer_is_help(bufnr)
-			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
-			return (listed or help) and loaded
-		end)
-		:totable()
+	    :filter(function(bufnr)
+		    local listed = vim.api.nvim_get_option_value("buflisted", { buf = bufnr })
+		    local help = M.buffer_is_help(bufnr)
+		    local loaded = vim.api.nvim_buf_is_loaded(bufnr)
+		    return (listed or help) and loaded
+	    end)
+	    :totable()
 end
 
 ---@return integer[]
 M.buffer_list_all = function()
 	return vim.iter(vim.api.nvim_list_bufs())
-		:filter(function(bufnr)
-			local loaded = vim.api.nvim_buf_is_loaded(bufnr)
-			return loaded
-		end)
-		:totable()
+	    :filter(function(bufnr)
+		    local loaded = vim.api.nvim_buf_is_loaded(bufnr)
+		    return loaded
+	    end)
+	    :totable()
 end
 
 ---@return integer[]
 M.buffer_list_visible = function()
 	local visible = vim.iter(vim.api.nvim_list_wins())
-		:map(function(winid)
-			return vim.api.nvim_win_get_buf(winid)
-		end)
-		:filter(function(bufnr)
-			return vim.tbl_contains(M.buffer_list_all(), bufnr)
-		end)
-		:totable()
+	    :map(function(winid)
+		    return vim.api.nvim_win_get_buf(winid)
+	    end)
+	    :filter(function(bufnr)
+		    return vim.tbl_contains(M.buffer_list_all(), bufnr)
+	    end)
+	    :totable()
 
 	for _, bufnr in ipairs(visible) do
 		local buf_filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
@@ -310,7 +310,6 @@ M.buffer_close = function(bufnr, force)
 					vim.api.nvim_win_set_buf(winnr, new_buf)
 				else
 					vim.api.nvim_buf_delete(bufnr, { force = force })
-					vim.notify("Could not find suitable replacement buffer", vim.log.levels.WARN)
 					return false
 				end
 			end
@@ -332,19 +331,19 @@ M.buffer_next = function()
 	end
 
 	local history_list = vim.iter(buffer_list)
-		:filter(function(bufnr)
-			return vim.api.nvim_buf_is_loaded(bufnr)
-		end)
-		:filter(function(bufnr)
-			return vim.api.nvim_get_option_value("buflisted", { buf = bufnr }) == true
-		end)
-		:map(function(bufnr)
-			return {
-				buffer = bufnr,
-				lastused = vim.fn.getbufinfo(bufnr)[1].lastused,
-			}
-		end)
-		:totable()
+	    :filter(function(bufnr)
+		    return vim.api.nvim_buf_is_loaded(bufnr)
+	    end)
+	    :filter(function(bufnr)
+		    return vim.api.nvim_get_option_value("buflisted", { buf = bufnr }) == true
+	    end)
+	    :map(function(bufnr)
+		    return {
+			    buffer = bufnr,
+			    lastused = vim.fn.getbufinfo(bufnr)[1].lastused,
+		    }
+	    end)
+	    :totable()
 
 	table.sort(history_list, function(a, b)
 		return a.lastused > b.lastused
@@ -480,13 +479,12 @@ end
 ---@param force boolean
 ---@param buf integer?
 M.smartclose = function(force, buf)
-	print('DEBUG: ' .. 'Smartclose called')
 	local buffer_list = M.buffer_list()
 	local buffer_list_visible = M.buffer_list_visible()
 	local window_list = M.window_list()
 
 	local float_exists_must_close = vim.iter(window_list):any(M.window_is_floating)
-		and M.options.actions.close_all.floating
+	    and M.options.actions.close_all.floating
 
 	local current_buffer = buf or M.buffer_current()
 	local current_buffer_is_modified = M.buffer_is_modified(current_buffer)
@@ -558,7 +556,7 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.filetypes):each(function(filetype)
 			if M.list_contains(buffer_list, bufnr) then
 				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and
-					not M.buffer_is_modified(bufnr)
+				    not M.buffer_is_modified(bufnr)
 				local ca_force_close = ca_can_force_close or force
 				local closed = M.buffer_close_if_filetype(bufnr, filetype, ca_force_close)
 				if closed then
@@ -569,7 +567,7 @@ M.smartclose = function(force, buf)
 		vim.iter(M.options.actions.close_all.buftypes):each(function(buftype)
 			if M.list_contains(buffer_list, bufnr) then
 				local ca_can_force_close = M.buffer_is_modifiable(bufnr) and
-					not M.buffer_is_modified(bufnr)
+				    not M.buffer_is_modified(bufnr)
 				local ca_force_close = ca_can_force_close or force
 				local closed = M.buffer_close_if_buftype(bufnr, buftype, ca_force_close)
 				if closed then
